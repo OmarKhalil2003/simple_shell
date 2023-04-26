@@ -1,54 +1,48 @@
-#include "main.h"
-/**
- * main - main function
- * @argc: argument count
- * @argv: argumetn vector
- * Return: zero
-*/
-int main(int argc, char **argv)
-{
-	char *prompt = "(My_Shell)$ ";
-	char *lineptr = NULL, *lineptr_copy = NULL, *token;
-	const char *delim = " \n";
-	size_t n = 0;
-	ssize_t nchars_read;
-	int i, num_tokens = 0;
+#include "shell.h"
 
-	(void)argc;
-	while (1)
+/**
+  * main - Entry point to the Shell
+  *
+  * Return: Always zero.
+  */
+int main(void)
+{
+	char *line = NULL, **u_tokns = NULL;
+	int w_len = 0, execFlag = 0;
+	size_t line_size = 0;
+	ssize_t line_len = 0;
+
+	while (line_len >= 0)
 	{
-		printf("%s", prompt);
-		nchars_read = getline(&lineptr, &n, stdin);
-		if (nchars_read == -1)
+		signal(SIGINT, signal_handler);
+		if (isatty(STDIN_FILENO))
+			write(STDOUT_FILENO, "($) ", 4);
+		line_len = getline(&line, &line_size, stdin);
+		if (line_len == -1)
 		{
-			return (-1);
+			if (isatty(STDIN_FILENO))
+				write(STDOUT_FILENO, "\n", 1);
+			break;
 		}
-		lineptr_copy = malloc(sizeof(char) * nchars_read);
-		if (lineptr_copy == NULL)
+
+		w_len = count_input(line);
+		if (line[0] != '\n' && w_len > 0)
 		{
-			perror("tsh: memory allocation error");
-			return (-1);
+			u_tokns = tokenize(line, " \t", w_len);
+			execFlag = execBuiltInCommands(u_tokns, line);
+			if (!execFlag)
+			{
+				u_tokns[0] = find(u_tokns[0]);
+				if (u_tokns[0] && access(u_tokns[0], X_OK) == 0)
+					exec(u_tokns[0], u_tokns);
+				else
+					perror("./hsh");
+			}
+
+			frees_tokens(u_tokns);
 		}
-		strcpy(lineptr_copy, lineptr);
-		token = strtok(lineptr, delim);
-		while (token != NULL) /* determine how many tokens are there*/	
-		{
-			num_tokens++;
-			token = strtok(NULL, delim);
-		}
-		num_tokens++;
-		argv = malloc(sizeof(char *) * num_tokens);
-		token = strtok(lineptr_copy, delim);
-		for (i = 0; token != NULL; i++)
-		{
-			argv[i] = malloc(sizeof(char) * strlen(token));
-			strcpy(argv[i], token);
-			token = strtok(NULL, delim);
-		}
-		argv[i] = NULL;
-		execmd(argv);
 	}
-	free(lineptr_copy);
-	free(lineptr);
+
+	free(line);
 	return (0);
 }
